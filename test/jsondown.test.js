@@ -3,6 +3,9 @@ const suite = require("abstract-leveldown/test");
 const JsonDOWN = require("../jsondown");
 const tempy = require("tempy");
 const path = require("path");
+const encode = require("encoding-down");
+const levelup = require("levelup");
+const fs = require("fs");
 
 const testCommon = suite.common({
   test,
@@ -80,7 +83,7 @@ test("batchOps with values", (t) => {
   });
 });
 
-test("batchOps with values", (t) => {
+test.skip("bad buffer should return error", (t) => {
   const db = testCommon.factory();
   db.location = tempy.writeSync('{"foo":{"type":"Buffer","data":"ding"}}', {
     name: "db.json",
@@ -92,7 +95,7 @@ test("batchOps with values", (t) => {
         'Error parsing value {"type":"Buffer","data":"ding"} as a buffer',
         "g"
       ),
-      "bad path returns an error"
+      "bad buffer should return error"
     );
     t.end();
   });
@@ -114,3 +117,32 @@ test("batchOps with int", (t) => {
 });
 
 test("tearDown", testCommon.tearDown);
+
+test("enable json encoding in stored json", (t) => {
+  const directory = tempy.directory();
+  const jsonDown = new JsonDOWN(directory, true);
+  const db = levelup(
+    encode(jsonDown, {
+      valueEncoding: "json",
+    })
+  );
+  const key = "example";
+  const value = {
+    object: true,
+  };
+  const expected = `{
+  "example": {
+    "object": true
+  }
+}`;
+  expected[key] = value;
+  db.put(key, value, (err) => {
+    db.get(key, (err, value) => {
+      t.error(err);
+      fs.readFile(jsonDown.location, "utf8", (err, data) => {
+        t.deepEqual(data, expected, "Value matches");
+        t.end();
+      });
+    });
+  });
+});
